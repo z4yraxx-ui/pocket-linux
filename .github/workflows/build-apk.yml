@@ -20,21 +20,11 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-                - name: Preparar Java
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '17'
-
       - name: Preparar Android SDK
         uses: android-actions/setup-android@v4
         with:
           accept-android-sdk-licenses: true
           packages: "platform-tools platforms;android-35 build-tools;35.0.0"
-
-      - name: Preparar Gradle
-        uses: gradle/actions/setup-gradle@v4
-
 
       - name: Preparar Gradle
         uses: gradle/actions/setup-gradle@v4
@@ -74,7 +64,12 @@ jobs:
 
       - name: Compilar APK
         run: |
-          gradle -p "$PROJECT_DIR" assembleDebug --stacktrace
+          if [ -f "$PROJECT_DIR/gradlew" ]; then
+            chmod +x "$PROJECT_DIR/gradlew"
+            "$PROJECT_DIR/gradlew" -p "$PROJECT_DIR" assembleDebug --stacktrace
+          else
+            gradle -p "$PROJECT_DIR" assembleDebug --stacktrace
+          fi
 
       - name: Localizar APK
         run: |
