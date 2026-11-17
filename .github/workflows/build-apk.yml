@@ -1,4 +1,3 @@
-
 name: Build PocketLinux APK
 
 on:
@@ -31,63 +30,12 @@ jobs:
         with:
           gradle-version: '8.9'
 
-      - name: Extrair projeto ZIP
-        run: |
-          set -e
-
-          ZIP_FILE=$(find . -maxdepth 1 -type f -iname "*.zip" -print -quit)
-
-          if [ -z "$ZIP_FILE" ]; then
-            echo "ERRO: Nenhum ZIP encontrado!"
-            exit 1
-          fi
-
-          mkdir extracted
-          unzip -q "$ZIP_FILE" -d extracted
-
-          echo "Arquivos encontrados:"
-          find extracted -maxdepth 3 -type f | head -100
-
-          SETTINGS=$(find extracted -type f \
-            \( -name "settings.gradle.kts" -o -name "settings.gradle" \) \
-            -print -quit)
-
-          if [ -z "$SETTINGS" ]; then
-            echo "ERRO: Projeto Gradle nao encontrado!"
-            exit 1
-          fi
-
-          PROJECT_DIR=$(dirname "$SETTINGS")
-          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
-
-          echo "Projeto localizado em: $PROJECT_DIR"
-
       - name: Compilar APK
-        run: |
-          if [ -f "$PROJECT_DIR/gradlew" ]; then
-            chmod +x "$PROJECT_DIR/gradlew"
-            "$PROJECT_DIR/gradlew" -p "$PROJECT_DIR" assembleDebug --stacktrace "-ProotfsRepo=$GITHUB_REPOSITORY"
-          else
-            gradle -p "$PROJECT_DIR" assembleDebug --stacktrace "-ProotfsRepo=$GITHUB_REPOSITORY"
-          fi
-
-      - name: Localizar APK
-        run: |
-          set -e
-
-          APK=$(find "$PROJECT_DIR" -type f \
-            -path "*/build/outputs/apk/debug/*.apk" \
-            -print -quit)
-
-          if [ -z "$APK" ]; then
-            echo "ERRO: APK nao encontrado!"
-            exit 1
-          fi
-
-          cp "$APK" PocketLinux-debug.apk
+        run: gradle assembleDebug --stacktrace "-ProotfsRepo=$GITHUB_REPOSITORY"
 
       - name: Disponibilizar APK
         uses: actions/upload-artifact@v4
         with:
           name: PocketLinux-APK
-          path: PocketLinux-debug.apk
+          path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
