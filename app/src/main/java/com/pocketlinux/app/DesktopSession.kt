@@ -9,6 +9,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -226,7 +227,7 @@ object DesktopSession {
         val socket = File(xDir, SOCKET_NAME)
         val deadline = SystemClock.elapsedRealtime() + 20_000
         while (!socket.exists()) {
-            ensureActive()
+            currentCoroutineContext().ensureActive()
             if (!server.isAlive) return fail(app, "O servidor X fechou ao iniciar (código ${server.exitValue()}).")
             if (SystemClock.elapsedRealtime() > deadline) {
                 return fail(app, "O servidor X demorou demais para iniciar.")
