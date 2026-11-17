@@ -1,0 +1,92 @@
+name: Build Debian rootfs
+
+# Monta o Debian ARM64 + LXQt e publica na Release "rootfs-latest".
+# É de lá que o app PocketLinux baixa o sistema. Rode manualmente (Run workflow)
+# na primeira vez e sempre que quiser uma base mais nova.
+# Requer repositório PÚBLICO (o app baixa sem login e o runner ARM64 é grátis só em público).
+
+on:
+  workflow_dispatch:
+    inputs:
+      suite:
+        description: "Versão do Debian (trixie = estável atual)"
+        required: true
+        default: trixie
+
+permissions:
+  contents: write
+
+jobs:
+  rootfs:
+    # Runner ARM64 nativo: sem emulação, bem mais rápido que montar ARM64 num runner x86.
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 120
+    env:
+      SUITE: ${{ inputs.suite }}
+      TAG: rootfs-latest
+      ASSET: debian-arm64-lxqt.tar.gz
+    steps:
+      - name: Escrever o Dockerfile
+        run: |
+          cat > Dockerfile <<'EOF'
+          ARG SUITE=trixie
+          FROM debian:${SUITE}
+          ENV DEBIAN_FRONTEND=noninteractive
+
+          # Ajustes para o apt/dpkg funcionarem dentro do PRoot:
+          #  - o usuário _apt do sandbox do apt não consegue trocar de uid sem root de verdade
+          #  - força gravação rápida no dpkg (o armazenamento do celular é lento)
+          #  - impede serviços de tentarem subir durante a instalação (não há init no PRoot)
+          RUN printf 'APT::Sandbox::User "root";\n' > /etc/apt/apt.conf.d/01pocket-proot \
+           && printf 'force-unsafe-io\n' > /etc/dpkg/dpkg.cfg.d/pocket-unsafe-io \
+           && printf '#!/bin/sh\nexit 101\n' > /usr/sbin/policy-rc.d \
+           && chmod +x /usr/sbin/policy-rc.d
+
+          RUN apt-get update \
+           && apt-get install -y --no-install-recommends \
+                sudo locales ca-certificates curl nano dbus-x11 \
+                lxqt-core qterminal pcmanfm-qt featherpad \
+           && sed -i 's/^# *\(pt_BR\.UTF-8\|en_US\.UTF-8\) UTF-8/\1 UTF-8/' /etc/locale.gen \
+           && locale-gen \
+           && useradd -m -u 1000 -s /bin/bash pocket \
+           && echo 'pocket ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/pocket \
+           && chmod 0440 /etc/sudoers.d/pocket \
+           && apt-get clean \
+           && rm -rf /var/lib/apt/lists/*
+          EOF
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Montar o rootfs
+        run: |
+          docker buildx build --platform linux/arm64 --build-arg SUITE="$SUITE" \
+            --output type=tar,dest=rootfs.tar .
+          gzip -6 -c rootfs.tar > "$ASSET"
+          rm rootfs.tar
+          sha256sum "$ASSET" > "$ASSET.sha256"
+          ls -lh "$ASSET" "$ASSET.sha256"
+          cat "$ASSET.sha256"
+
+      - name: Conferir o conteúdo
+        run: |
+          tar -tzf "$ASSET" | grep -E '^(\./)?usr/bin/bash$'
+          tar -tzf "$ASSET" | grep -E '^(\./)?usr/bin/startlxqt$'
+          SIZE=$(stat -c %s "$ASSET")
+          echo "Tamanho: $SIZE bytes"
+          if [ "$SIZE" -gt 2000000000 ]; then
+            echo "::error::O arquivo passa do limite de 2 GB por arquivo do GitHub Releases."
+            exit 1
+          fi
+
+      - name: Publicar na Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh release view "$TAG" >/dev/null 2>&1 || gh release create "$TAG" \
+            --title "Debian rootfs (ARM64 + LXQt)" \
+            --notes "Placeholder"
+          gh release upload "$TAG" "$ASSET" "$ASSET.sha256" --clobber
+          gh release edit "$TAG" \
+            --title "Debian rootfs (ARM64 + LXQt)" \
+            --notes "Debian $SUITE ARM64 com LXQt, baixado pelo app PocketLinux. Gerado pelo workflow Build Debian rootfs em $(date -u +%Y-%m-%d)."
