@@ -1,0 +1,108 @@
+// Módulo "lorie": servidor X do Termux:X11 (GPL-3.0), copiado de
+// https://github.com/termux/termux-x11 (commit a00942e8) e adaptado ao PocketLinux.
+// Mudanças em relação ao original estão listadas em lorie/UPSTREAM.md.
+apply plugin: 'com.android.library'
+apply from: 'version.gradle'
+
+android {
+    namespace 'com.termux.x11'
+    compileSdkVersion 35
+    ndkVersion termuxX11NdkVersion
+    defaultConfig {
+        minSdkVersion 26
+        buildConfigField "String", "VERSION_NAME", "\"${termuxX11VersionName}\""
+        buildConfigField "String", "COMMIT", "\"" + ("git rev-parse HEAD\n".execute().getText().trim() ?: (System.getenv('CURRENT_COMMIT') ?: "NO_COMMIT")) + "\""
+        // O app que embute este módulo (recebe o broadcast que o servidor X envia ao subir).
+        buildConfigField "String", "APPLICATION_ID", "\"com.pocketlinux.app\""
+
+        // O Debian é ARM64: não há motivo para compilar o servidor X para outras ABIs.
+        ndk { abiFilters 'arm64-v8a' }
+
+        consumerProguardFiles 'proguard-rules.pro'
+    }
+
+    compileOptions.sourceCompatibility JavaVersion.VERSION_1_9
+    compileOptions.targetCompatibility JavaVersion.VERSION_1_9
+    externalNativeBuild.cmake.path "src/main/cpp/CMakeLists.txt"
+    externalNativeBuild.cmake.version "3.22.1"
+    buildFeatures.aidl true
+    buildFeatures.buildConfig true
+}
+
+dependencies {
+    implementation 'androidx.preference:preference:1.2.1'
+    compileOnly project(':lorie-stub')
+}
+afterEvaluate {
+    tasks.register("generatePrefs") {
+        //noinspection UnnecessaryQualifiedReference
+        def xml = groovy.xml.DOMBuilder.parse((new StringReader(file('src/main/res/xml/preferences.xml').text)))
+        def preferenceNodes = xml.documentElement.getElementsByTagName("*")
+        def preferences = []
+
+        for (int i = 0; i < preferenceNodes.length; i++) {
+            def node = preferenceNodes.item(i)
+            if (node.nodeName == 'EditTextPreference' && node.getAttribute("app:key") != "extra_keys_config")
+                preferences << [ type: 'String',  key: node.getAttribute("app:key"), default: node.getAttribute("app:defaultValue") ]
+            else if (node.nodeName == 'SeekBarPreference')
+                preferences << [ type: 'Int', key: node.getAttribute("app:key"), default: node.getAttribute("app:defaultValue") ]
+            else if (node.nodeName == 'ListPreference') {
+                def entries = node.getAttribute("app:entries")
+                def values = node.getAttribute("app:entryValues")
+                preferences << [type: 'List', key: node.getAttribute("app:key"), default: node.getAttribute("app:defaultValue"),
+                                entries: entries.substring(7, entries.length()), values: values.substring(7, values.length())]
+            }
+            else if (node.nodeName == 'SwitchPreferenceCompat')
+                preferences << [ type: 'Boolean',  key: node.getAttribute("app:key"), default: node.getAttribute("app:defaultValue") ]
+        }
+
+        def out = file('build/generated/java/com/termux/x11/Prefs.java')
+        out.getParentFile().exists() || out.getParentFile().mkdirs()
+        out.delete()
+        out.createNewFile()
+
+        out << 'package com.termux.x11;\n'
+        out << 'import java.util.HashMap;\n'
+        out << 'import android.content.Context;\n'
+        out << 'import android.content.SharedPreferences;\n'
+        out << 'import com.termux.x11.utils.TermuxX11ExtraKeys;\n'
+        out << '\n'
+        out << 'public class Prefs extends LoriePreferences.PrefsProto {\n'
+        preferences.each {
+            if (it.type == 'Int' || it.type == 'Boolean')
+                out << "  public final ${it.type}Preference ${it.key} = new ${it.type}Preference(\"${it.key}\", ${it.default});\n"
+            else if (it.type == 'String')
+                out << "  public final StringPreference ${it.key} = new StringPreference(\"${it.key}\", \"${it.default}\");\n"
+            else if (it.type == 'List')
+                out << "  public final ${it.type}Preference ${it.key} = new ${it.type}Preference(\"${it.key}\", \"${it.default}\", R.array.${it.entries}, R.array.${it.values});\n"
+        }
+        out << '  public final StringPreference extra_keys_config = new StringPreference("extra_keys_config", TermuxX11ExtraKeys.DEFAULT_IVALUE_EXTRA_KEYS);\n'
+        out << '  public final HashMap<String, Preference> keys = new HashMap<>() {{\n'
+        preferences.each { out << '    put("' + it.key + '", ' + it.key + ');\n' }
+        out << '    put("extra_keys_config", extra_keys_config);\n'
+        out << '  }};\n'
+        out << '\n'
+        out << '  public Prefs() {}\n'
+        out << '\n'
+        out << '  @Override\n'
+        out << '  public void attach(Context ctx, SharedPreferences preferences) {\n'
+        out << '    super.attach(ctx, preferences);\n'
+        out << '    Object legacyKeepScreenOn = preferences.getAll().get("keepScreenOn");\n'
+        out << '    if (legacyKeepScreenOn instanceof Boolean && !preferences.contains("screenIdleTimeout"))\n'
+        out << '      preferences.edit().putString("screenIdleTimeout", (Boolean) legacyKeepScreenOn ? "never" : "system").commit();\n'
+        out << '  }\n'
+        out << '}\n'
+    }
+    android.sourceSets.main.java.srcDirs += 'build/generated/java'
+    preBuild.dependsOn generatePrefs
+
+    tasks.register("generateShortcuts") {
+        def out = file('build/generated/templateRes/xml/lorie_shortcuts.xml')
+        out.getParentFile().exists() || out.getParentFile().mkdirs()
+        out.text = file('src/main/templates/xml/shortcuts.xml').text
+                .replace('@@APPLICATION_ID@@', "com.pocketlinux.app")
+    }
+    android.sourceSets.main.res.srcDirs += 'build/generated/templateRes'
+    preBuild.dependsOn generateShortcuts
+}
+

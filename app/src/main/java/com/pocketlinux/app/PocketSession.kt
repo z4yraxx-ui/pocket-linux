@@ -28,7 +28,7 @@ object PocketSession {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var installJob: Job? = null
 
-    private val runner by lazy { DebianRunner(paths) }
+    internal val runner by lazy { DebianRunner(paths) }
 
     private val _installState = MutableStateFlow<InstallState>(InstallState.NotInstalled)
     val installState: StateFlow<InstallState> = _installState.asStateFlow()
@@ -52,8 +52,8 @@ object PocketSession {
     val updateState: StateFlow<UpdateState> = _updateState.asStateFlow()
 
     /** Verdadeiro enquanto algo precisa manter o processo vivo: o shell ou uma atualização. */
-    val isBusy: Flow<Boolean> = combine(_isRunning, _updateState) { running, update ->
-        running || update.isBusy()
+    val isBusy: Flow<Boolean> = combine(_isRunning, _updateState, DesktopSession.state) { running, update, desktop ->
+        running || update.isBusy() || desktop.isBusy()
     }
 
     /** Vira verdadeiro se o PRoot só funcionou sem seccomp; comandos avulsos seguem o mesmo modo. */
@@ -62,6 +62,9 @@ object PocketSession {
 
     @Volatile
     private var userStopped = false
+
+    /** O PRoot só funcionou sem seccomp neste aparelho? Os outros programas seguem o mesmo modo. */
+    internal fun noSeccomp(): Boolean = noSeccompNeeded
 
     fun init(context: Context) {
         if (::paths.isInitialized) return
@@ -140,7 +143,7 @@ object PocketSession {
      * Ele se desliga sozinho quando [isBusy] vira falso. Se o Android recusar
      * (app fora de primeiro plano), o Debian segue rodando só enquanto o app viver.
      */
-    private fun startBackgroundService() {
+    internal fun startBackgroundService() {
         try {
             ContextCompat.startForegroundService(appContext, Intent(appContext, PocketService::class.java))
         } catch (e: Exception) {
