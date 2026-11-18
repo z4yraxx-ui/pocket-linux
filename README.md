@@ -2,7 +2,7 @@
 
 Um ambiente Linux no Android: Debian ARM64 + LXQt rodando dentro do app, sem root, com instalação e execução integradas (sem terminal externo, sem adb).
 
-## Estado desta versão (0.5.0, fase 2)
+## Estado desta versão (0.6.0, fase 3)
 
 - ✅ O botão **Instalar Debian** baixa o sistema pronto (Release do seu GitHub), confere o SHA-256 e extrai no armazenamento privado do app. O download continua de onde parou se cair.
   
