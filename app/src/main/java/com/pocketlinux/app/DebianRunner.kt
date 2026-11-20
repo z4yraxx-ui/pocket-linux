@@ -33,7 +33,7 @@ class DebianRunner(private val paths: PocketPaths) {
             "-r", paths.rootfsDir.path,
             // root simulado (apt, dpkg e sudo funcionam) ou o usuário comum "pocket" (uid 1000)
             if (asUser) "--change-id=1000:1000" else "-0",
-            "--link2symlink", // o Android proíbe hard links: o PRoot troca por links simbólicos
+            // TESTE: sem --link2symlink, para o instalador do Hermes conseguir hardlinks
             "--kill-on-exit",
             "-b", "/dev",
             "-b", "/proc",

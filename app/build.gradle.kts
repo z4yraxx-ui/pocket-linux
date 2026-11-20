@@ -31,8 +31,8 @@ android {
         // targetSdk 28 de propósito (mesma escolha do Termux): a partir do 29 o Android
         // proíbe executar arquivos da pasta de dados do app, e é lá que o Debian fica.
         targetSdk = 28
-        versionCode = 6
-        versionName = "0.6.0"
+        versionCode = 7
+        versionName = "0.6.1-teste"
 
         // O rootfs é ARM64, então o APK só precisa da ABI arm64-v8a.
         ndk { abiFilters += "arm64-v8a" }
