@@ -10,8 +10,14 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Baixar repositorio
+      - name: Baixar repositorio (com os submódulos do servidor X)
         uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 1
+
+      - name: Ferramentas do build nativo do servidor X
+        run: sudo apt-get update && sudo apt-get install -y python3 bison patch
 
       - name: Preparar Java
         uses: actions/setup-java@v4
@@ -23,7 +29,7 @@ jobs:
         uses: android-actions/setup-android@v4
         with:
           accept-android-sdk-licenses: true
-          packages: "platform-tools platforms;android-35 build-tools;35.0.0 ndk;26.1.10909125 cmake;3.22.1"
+          packages: "platform-tools platforms;android-35 build-tools;35.0.0 ndk;29.0.14206865 cmake;3.22.1"
 
       - name: Preparar Gradle
         uses: gradle/actions/setup-gradle@v4

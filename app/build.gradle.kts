@@ -22,8 +22,8 @@ val prootGenDir = layout.buildDirectory.dir("generated/proot")
 android {
     namespace = "com.pocketlinux.app"
     compileSdk = 35
-    // Versões fixas das ferramentas nativas (o workflow instala as mesmas).
-    ndkVersion = "26.1.10909125"
+    // Mesma versão do NDK que o servidor X (módulo :lorie) exige; o workflow instala a mesma.
+    ndkVersion = "29.0.14206865"
 
     defaultConfig {
         applicationId = "com.pocketlinux.app"
@@ -31,8 +31,8 @@ android {
         // targetSdk 28 de propósito (mesma escolha do Termux): a partir do 29 o Android
         // proíbe executar arquivos da pasta de dados do app, e é lá que o Debian fica.
         targetSdk = 28
-        versionCode = 5
-        versionName = "0.5.0"
+        versionCode = 6
+        versionName = "0.6.0"
 
         // O rootfs é ARM64, então o APK só precisa da ABI arm64-v8a.
         ndk { abiFilters += "arm64-v8a" }
@@ -144,5 +144,7 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
     // Leitor de .tar (o Android não tem um nativo).
     implementation("org.apache.commons:commons-compress:1.27.1")
+    // Servidor X do Termux:X11 (GPL-3.0): tela, teclado e mouse do desktop.
+    implementation(project(":lorie"))
     debugImplementation("androidx.compose.ui:ui-tooling")
 }

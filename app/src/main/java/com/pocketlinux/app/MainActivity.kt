@@ -49,8 +49,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -118,7 +120,9 @@ private fun HomeScreen(onOpenTerminal: () -> Unit, onOpenDiagnostics: () -> Unit
     val state by PocketSession.installState.collectAsState()
     val running by PocketSession.isRunning.collectAsState()
     val update by PocketSession.updateState.collectAsState()
+    val desktop by DesktopSession.state.collectAsState()
     val context = LocalContext.current
+    val clipboard = LocalClipboardManager.current
     var confirmDelete by remember { mutableStateOf(false) }
 
     // Acesso ao armazenamento do celular (pasta ~/Android no Debian).
@@ -141,9 +145,6 @@ private fun HomeScreen(onOpenTerminal: () -> Unit, onOpenDiagnostics: () -> Unit
         } else {
             startAndOpen()
         }
-    }
-    val soon = { name: String ->
-        Toast.makeText(context, "$name chega nas próximas fases", Toast.LENGTH_SHORT).show()
     }
 
     Column(
@@ -229,8 +230,7 @@ private fun HomeScreen(onOpenTerminal: () -> Unit, onOpenDiagnostics: () -> Unit
 
                     is InstallState.Installed -> {
                         Text(
-                            "O Debian está instalado. Por enquanto você usa por um terminal de texto; " +
-                                "o desktop LXQt chega na fase 3.",
+                            "O Debian está instalado. Use o terminal de texto ou abra o desktop LXQt no cartão abaixo.",
                             color = Muted,
                             fontSize = 13.sp
                         )
@@ -266,9 +266,24 @@ private fun HomeScreen(onOpenTerminal: () -> Unit, onOpenDiagnostics: () -> Unit
             }
         }
 
+        if (installed) {
+            DesktopCard(
+                state = desktop,
+                onStart = { DesktopSession.start(context) },
+                onStop = { DesktopSession.stop(context) },
+                onCopyLog = { clipboard.setText(AnnotatedString(DesktopSession.fullLog())) }
+            )
+        }
+
         Text("Acesso rápido", fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            QuickTile("Desktop", Icons.Default.Monitor, Modifier.weight(1f)) { soon("O desktop") }
+            QuickTile("Desktop", Icons.Default.Monitor, Modifier.weight(1f)) {
+                if (installed) {
+                    DesktopSession.start(context)
+                } else {
+                    Toast.makeText(context, "Instale o Debian primeiro", Toast.LENGTH_SHORT).show()
+                }
+            }
             QuickTile("Arquivos", Icons.Default.Folder, Modifier.weight(1f)) {
                 storageGranted = PocketSession.hasPhoneStorageAccess()
                 showStorage = true
@@ -286,7 +301,7 @@ private fun HomeScreen(onOpenTerminal: () -> Unit, onOpenDiagnostics: () -> Unit
         }
 
         Spacer(Modifier.weight(1f))
-        Text("PocketLinux ${BuildConfig.VERSION_NAME} • fase 2", color = Muted, fontSize = 11.sp)
+        Text("PocketLinux ${BuildConfig.VERSION_NAME} • fase 3", color = Muted, fontSize = 11.sp)
     }
 
     UpdateDialog(onOpenTerminal = onOpenTerminal)

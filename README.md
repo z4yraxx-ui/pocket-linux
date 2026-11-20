@@ -27,6 +27,7 @@ Um ambiente Linux no Android: Debian ARM64 + LXQt rodando dentro do app, sem roo
 - Este projeto: GPL-3.0 (arquivo LICENSE).
 - PRoot: GPL-2.0+ (https://github.com/proot-me/proot). Binários de https://github.com/green-green-avk/build-proot-android (scripts MIT; talloc LGPL).
 - Apache Commons Compress: Apache-2.0.
+- Servidor X11 (pasta `lorie/`): Termux:X11, GPL-3.0 (https://github.com/termux/termux-x11), adaptado para este projeto; veja `lorie/UPSTREAM.md`.
 - Debian e os pacotes instalados têm as licenças de cada projeto.
 
 - 

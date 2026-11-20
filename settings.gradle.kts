@@ -14,3 +14,5 @@ dependencyResolutionManagement {
 }
 rootProject.name = "PocketLinux"
 include(":app")
+include(":lorie")
+include(":lorie-stub")
