@@ -52,8 +52,13 @@ object PocketSession {
     val updateState: StateFlow<UpdateState> = _updateState.asStateFlow()
 
     /** Verdadeiro enquanto algo precisa manter o processo vivo: o shell ou uma atualização. */
-    val isBusy: Flow<Boolean> = combine(_isRunning, _updateState, DesktopSession.state) { running, update, desktop ->
-        running || update.isBusy() || desktop.isBusy()
+    val isBusy: Flow<Boolean> = combine(
+        _isRunning,
+        _updateState,
+        DesktopSession.state,
+        HermesSession.state
+    ) { running, update, desktop, hermes ->
+        running || update.isBusy() || desktop.isBusy() || hermes.isBusy()
     }
 
     /** Vira verdadeiro se o PRoot só funcionou sem seccomp; comandos avulsos seguem o mesmo modo. */
