@@ -38,6 +38,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -86,7 +87,8 @@ fun PocketLinuxApp() {
     val install by PocketSession.installState.collectAsState()
     val update by PocketSession.updateState.collectAsState()
     val view = LocalView.current
-    val keepOn = install is InstallState.Working || update.isBusy()
+    val hermesInstall by HermesSession.state.collectAsState()
+    val keepOn = install is InstallState.Working || update.isBusy() || hermesInstall is HermesState.Installing
     DisposableEffect(keepOn) {
         view.keepScreenOn = keepOn
         onDispose { view.keepScreenOn = false }
@@ -121,6 +123,7 @@ private fun HomeScreen(onOpenTerminal: () -> Unit, onOpenDiagnostics: () -> Unit
     val running by PocketSession.isRunning.collectAsState()
     val update by PocketSession.updateState.collectAsState()
     val desktop by DesktopSession.state.collectAsState()
+    val hermes by HermesSession.state.collectAsState()
     val context = LocalContext.current
     val clipboard = LocalClipboardManager.current
     var confirmDelete by remember { mutableStateOf(false) }
@@ -134,8 +137,14 @@ private fun HomeScreen(onOpenTerminal: () -> Unit, onOpenDiagnostics: () -> Unit
 
     val installed = state is InstallState.Installed
     var askBattery by remember { mutableStateOf(false) }
+    // Pedido pelo botão "Abrir Hermes": digita o comando do Hermes no terminal recém-aberto.
+    var wantHermes by remember { mutableStateOf(false) }
     val startAndOpen = {
         PocketSession.startShell()
+        if (wantHermes) {
+            wantHermes = false
+            HermesSession.typeLaunchCommand()
+        }
         onOpenTerminal()
     }
     // Na primeira vez, explica e pede a isenção de bateria antes de ligar o Debian.
@@ -146,6 +155,19 @@ private fun HomeScreen(onOpenTerminal: () -> Unit, onOpenDiagnostics: () -> Unit
             startAndOpen()
         }
     }
+    val openHermes = {
+        if (running) {
+            // O terminal já está aberto: não digita por cima de um programa em uso.
+            Toast.makeText(context, "O terminal já está rodando. Digite hermes nele.", Toast.LENGTH_LONG).show()
+            onOpenTerminal()
+        } else {
+            wantHermes = true
+            openTerminal()
+        }
+    }
+
+    // Confere se o Hermes já está instalado (e refaz a conferência quando o Debian muda).
+    LaunchedEffect(state) { HermesSession.refresh() }
 
     Column(
         modifier = Modifier
@@ -273,6 +295,14 @@ private fun HomeScreen(onOpenTerminal: () -> Unit, onOpenDiagnostics: () -> Unit
                 onStop = { DesktopSession.stop(context) },
                 onCopyLog = { clipboard.setText(AnnotatedString(DesktopSession.fullLog())) }
             )
+            HermesCard(
+                state = hermes,
+                onInstall = { HermesSession.install() },
+                onOpen = openHermes,
+                onDoctor = { HermesSession.runDoctor() },
+                onCopyLog = { clipboard.setText(AnnotatedString(HermesSession.fullLog())) },
+                onDismissError = { HermesSession.dismissFailure() }
+            )
         }
 
         Text("Acesso rápido", fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
@@ -301,7 +331,7 @@ private fun HomeScreen(onOpenTerminal: () -> Unit, onOpenDiagnostics: () -> Unit
         }
 
         Spacer(Modifier.weight(1f))
-        Text("PocketLinux ${BuildConfig.VERSION_NAME} • fase 3", color = Muted, fontSize = 11.sp)
+        Text("PocketLinux ${BuildConfig.VERSION_NAME} • fase 4 (Hermes)", color = Muted, fontSize = 11.sp)
     }
 
     UpdateDialog(onOpenTerminal = onOpenTerminal)

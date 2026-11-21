@@ -46,7 +46,7 @@ jobs:
            && apt-get install -y --no-install-recommends \
                 sudo locales ca-certificates curl nano dbus-x11 \
                 xkb-data fonts-dejavu-core x11-xserver-utils \
-                lxqt-core qterminal pcmanfm-qt featherpad \
+                lxqt-core openbox qterminal pcmanfm-qt featherpad \
            && sed -i 's/^# *\(pt_BR\.UTF-8\|en_US\.UTF-8\) UTF-8/\1 UTF-8/' /etc/locale.gen \
            && locale-gen \
            && useradd -m -u 1000 -s /bin/bash pocket \
